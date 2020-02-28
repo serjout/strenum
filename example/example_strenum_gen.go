@@ -41,3 +41,36 @@ func StrToSomethingEnum(s string) (SomethingEnum, error) {
 	}
 	return nil, errors.New("unknown SomethingEnum " + s)
 }
+
+func ToStrings(ss []SomethingEnum) ([]string, error) {
+	if slice == nil {
+		return nil
+	}
+	result := make([]string, len(slice))
+	for i, val := range slice {
+		if val == nil {
+			return nil, errors.New("unexpected enum SomethingEnum value: nil")
+		}
+		result[i] = val.String()
+	}
+	return result, nil
+}
+
+func MustToStrings(ss []SomethingEnum) []string {
+	result, err := ToStrings(ss)
+	if err != nil {
+		panic(err.Error())
+	}
+	return result
+}
+
+func FromStrings(ss []strings) ([]SomethingEnum, error) {
+	if slice == nil {
+		return nil
+	}
+	result := make([]string, len(slice))
+	for i, val := range slice {
+		result[i] = val.String()
+	}
+	return result
+}

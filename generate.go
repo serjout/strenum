@@ -38,7 +38,7 @@ func main() {
 	values := strings.Split(args[2], ",")
 	dir := filepath.Dir(path)
 
-	result, err := generate("", name, values...)
+	result, err := generate(name, values...)
 	if err != nil {
 
 	}
@@ -53,13 +53,15 @@ func main() {
 	}
 }
 
-func generate(packageName, name string, values ...string) (result []byte, err error) {
+func generate(name string, values ...string) (result []byte, err error) {
 	if len(name) == 0 {
 		return nil, fmt.Errorf("Invalid argument name: %s", name)
 	}
 	if len(values) == 0 {
 		return nil, fmt.Errorf("Invalid argument values: %s", strings.Join(values, ","))
 	}
+
+	packageName := strings.ToLower(name) + "enum"
 
 	buf := bytes.NewBuffer(make([]byte, 0))
 
@@ -83,6 +85,11 @@ import "errors"
 	}
 
 	err = generateFuncFromStr(buf, name, values...)
+	if err != nil {
+		return nil, err
+	}
+
+	err = generateSlice(buf, name, values...)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +133,7 @@ func generateFuncFromStr(output io.Writer, name string, values ...string) error 
 		"enumValueName": enumValueName(name),
 		"enumName":      enumName,
 	}).Parse(`
-		func StrTo{{enumName .Name}}(s string) ({{enumName .Name}}, error) {
+		func FromString(s string) ({{enumName .Name}}, error) {
 			switch s {
 			{{- range .Values}}
 				case str{{enumValueName .}}: return Enum{{enumValueName .}}, nil
@@ -196,6 +203,58 @@ func generateInterface(output io.Writer, name string, values ...string) error {
 		
 		func (s {{$private}}) String() string {
 			return string(s)
+		}
+	`))
+	err := t.Execute(output, Data{
+		Name:   name,
+		Values: values,
+	})
+	return err
+}
+
+func generateSlice(output io.Writer, name string, values ...string) error {
+	type Data struct {
+		Name   string
+		Values []string
+	}
+	t := template.Must(template.New("Interface").Funcs(template.FuncMap{
+		"enumName":        enumName,
+		"lower":           strings.ToLower,
+		"privateTypeName": privateTypeName,
+	}).Parse(`
+		{{$public := enumName .Name }}
+
+		func ToStrings(ss []{{$public}}) ([]string, error) {
+			if slice == nil {
+				return nil
+			}
+			result := make([]string, len(slice))
+			for i, val := range slice {
+				if val == nil {
+					return nil, errors.New("unexpected enum {{$public}} value: nil")
+				}
+				result[i] = val.String()
+			}
+			return result, nil
+		}
+		
+		func MustToStrings(ss []{{$public}}) []string {
+			result, err := ToStrings(ss)
+			if err != nil {
+				panic(err.Error())
+			}
+			return result
+		}
+		
+		func FromStrings(ss []strings) ([]{{$public}}, error) {
+			if slice == nil {
+				return nil
+			}
+			result := make([]string, len(slice))
+			for i, val := range slice {
+				result[i] = val.String()
+			}
+			return result
 		}
 	`))
 	err := t.Execute(output, Data{
